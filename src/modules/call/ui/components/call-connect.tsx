@@ -38,7 +38,7 @@ export const CallConnect = ({ meetingId, meetingName, userId, userName, userImag
         const _client = new StreamVideoClient({
             apiKey: process.env.NEXT_PUBLIC_STREAM_API_KEY!,
             user: { id: userId, name: userName, image: userImage },
-            tokenProvider: generateToken,
+            tokenProvider: () => generateToken(),
         });
         setVideoClient(_client);
 

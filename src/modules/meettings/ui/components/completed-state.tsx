@@ -3,13 +3,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Markdown from "react-markdown";
 import { MeetingGetOne } from "../../types";
 import { GeneratedAvatar } from "@/components/generated-avatar";
-import { FileTextIcon, BookOpenTextIcon, FileVideoIcon, ClockFadingIcon, SparklesIcon } from "lucide-react";
+import { FileTextIcon, BookOpenTextIcon, FileVideoIcon, ClockFadingIcon, SparklesIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
 import { format} from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration } from "@/lib/utils";
 import { Transcript } from "./transcript";
 import { ChatProvider } from "./chat-provider";
+import { ChatHistoryProvider } from "./chat-history-provider";
 
 interface Props{
     data: MeetingGetOne;
@@ -35,6 +36,10 @@ export const CompletedState = ({data}: Props) => {
                                 <FileVideoIcon />
                                 Recording
                             </TabsTrigger>
+                             <TabsTrigger value="chatHistory" className="text-mute-foreground rounded-none bg-background data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-b-primary data-[state=active]:text-accent-foreground h-full hover:text-accent-foreground">
+                                <MessageSquareIcon />
+                                Chat
+                            </TabsTrigger>
                              <TabsTrigger value="chat" className="text-mute-foreground rounded-none bg-background data-[state=active]:shadow-none border-b-2 border-transparent data-[state=active]:border-b-primary data-[state=active]:text-accent-foreground h-full hover:text-accent-foreground">
                                 <SparklesIcon />
                                 Ask AI
@@ -43,6 +48,9 @@ export const CompletedState = ({data}: Props) => {
                         <ScrollBar orientation="horizontal"/>
                     </ScrollArea>
                 </div>
+                <TabsContent value="chatHistory">
+                    <ChatHistoryProvider meetingId={data.id} />
+                </TabsContent>
                 <TabsContent value="chat">
                     <ChatProvider meetingId={data.id} meetingName={data.name} />
                 </TabsContent>

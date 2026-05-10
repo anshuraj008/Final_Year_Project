@@ -1,6 +1,6 @@
 import { z } from "zod";
 import JSONL from "jsonl-parse-stringify";
-import { and, count, desc, eq, getTableColumns, ilike, inArray, sql, or } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike, inArray, sql, or, not } from "drizzle-orm";
 import { db } from "@/db";
 import { agents, meetings, user, meetingParticipants } from "@/db/schema";
 import { createTRPCRouter, premiumProcedure, protectedProcedure,
@@ -28,59 +28,7 @@ export const meetingssRouter = createTRPCRouter({
         return token;
     }),
 
-    connectAgent: protectedProcedure
-        .input(z.object({ id: z.string() }))
-        .mutation(async ({ input }) => {
-            const [existingMeeting] = await db
-                .select()
-                .from(meetings)
-                .where(eq(meetings.id, input.id));
 
-            if (!existingMeeting) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "Meeting not found" });
-            }
-
-            const [existingAgent] = await db
-                .select()
-                .from(agents)
-                .where(eq(agents.id, existingMeeting.agentId));
-
-            if (!existingAgent) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
-            }
-
-            // Ensure meeting is marked active when connecting the agent
-            if (existingMeeting.status !== "active") {
-                await db
-                    .update(meetings)
-                    .set({ status: "active", startedAt: new Date() })
-                    .where(eq(meetings.id, existingMeeting.id));
-            }
-
-            // Ensure agent user exists in Stream
-            await streamVideo.upsertUsers([
-                {
-                    id: existingAgent.id,
-                    name: existingAgent.name,
-                    role: "user",
-                    image: generateAvatarUri({ seed: existingAgent.name, variant: "botttsNeutral" }),
-                },
-            ]);
-
-            const call = streamVideo.video.call("default", existingMeeting.id);
-            await call.get();
-            const realtimeClient = await streamVideo.video.connectOpenAi({
-                call,
-                openAiApiKey: process.env.OPENAI_API_KEY!,
-                agentUserId: existingAgent.id,
-            });
-
-            await realtimeClient.updateSession({
-                instructions: existingAgent.instructions,
-            });
-
-            return { status: "connected" } as const;
-        }),
 
     getTranscript: protectedProcedure
     .input(z.object({ id: z.string() }))
@@ -175,12 +123,10 @@ export const meetingssRouter = createTRPCRouter({
         ]);
 
         const expirationTime = Math.floor(Date.now() / 1000) + 3600;
-        const issuedAt = Math.floor(Date.now() / 1000) + 60;
 
         const token = streamVideo.generateUserToken({
             user_id: ctx.auth.user.id,
             exp: expirationTime,
-            validity_in_seconds: issuedAt
         });
 
         return token;
@@ -319,10 +265,11 @@ export const meetingssRouter = createTRPCRouter({
                 MeetingStatus.Cancelled,
             ])
                 .nullish(),
+            type: z.enum(["my-meetings", "others-meetings"]).nullish(),
         })
         )
         .query(async ({ ctx, input }) => {
-            const { search, page, pageSize, status, agentId } = input;
+            const { search, page, pageSize, status, agentId, type } = input;
 
             const participantMeetingIds = db.select({ id: meetingParticipants.meetingId })
                 .from(meetingParticipants)
@@ -340,10 +287,10 @@ export const meetingssRouter = createTRPCRouter({
                 .innerJoin(user, eq(meetings.userId, user.id))
                 .where(
                     and(
-                        or(
-                            eq(meetings.userId, ctx.auth.user.id),
+                        type === "others-meetings" ? and(
+                            not(eq(meetings.userId, ctx.auth.user.id)),
                             inArray(meetings.id, participantMeetingIds)
-                        ),
+                        ) : eq(meetings.userId, ctx.auth.user.id),
                         search ? ilike(meetings.name, `%${search}%`) : undefined,
                         status ? eq(meetings.status, status) : undefined,
                         agentId ? eq(meetings.agentId, agentId) : undefined,
@@ -358,10 +305,10 @@ export const meetingssRouter = createTRPCRouter({
                 .from(meetings)
                 .where(
                     and(
-                        or(
-                            eq(meetings.userId, ctx.auth.user.id),
+                        type === "others-meetings" ? and(
+                            not(eq(meetings.userId, ctx.auth.user.id)),
                             inArray(meetings.id, participantMeetingIds)
-                        ),
+                        ) : eq(meetings.userId, ctx.auth.user.id),
                         search ? ilike(meetings.name, `%${search}%`) : undefined,
                         status ? eq(meetings.status, status) : undefined,
                         agentId ? eq(meetings.agentId, agentId) : undefined,

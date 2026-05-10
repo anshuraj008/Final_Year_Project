@@ -19,14 +19,24 @@ export const CallChat = ({ chatClient, meetingId, onClose }: Props) => {
 
     useEffect(() => {
         if (!chatClient) return;
+        let watched = false;
 
-        const channel = chatClient.channel("messaging", `meeting-${meetingId}`);
+        const channel = chatClient.channel("messaging", `meeting-${meetingId}`, {
+            members: chatClient.userID ? [chatClient.userID] : [],
+        });
         channelRef.current = channel;
 
-        channel.watch().then(() => setChannelReady(true)).catch(console.error);
+        channel.watch()
+            .then(() => {
+                watched = true;
+                setChannelReady(true);
+            })
+            .catch(console.error);
 
         return () => {
-            channel.stopWatching().catch(console.error);
+            if (watched) {
+                channel.stopWatching().catch(console.error);
+            }
         };
     }, [chatClient, meetingId]);
 

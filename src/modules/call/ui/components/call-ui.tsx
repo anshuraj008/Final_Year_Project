@@ -16,9 +16,6 @@ interface Props {
 export const CallUI = ({ meetingId, meetingName, chatClient }: Props) => {
     const call = useCall();
     const trpc = useTRPC();
-    const { mutate: connectAgent } = useMutation(
-        trpc.meetings.connectAgent.mutationOptions()
-    );
 
     const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
     const isLeavingRef = useRef(false);
@@ -26,7 +23,6 @@ export const CallUI = ({ meetingId, meetingName, chatClient }: Props) => {
     const handleJoin = async () => {
         if (!call) return;
         await call.join();
-        connectAgent({ id: meetingId });
         setShow("call");
     };
 

@@ -62,27 +62,9 @@ export async function POST(req:NextRequest) {
             await db.update(meetings).set({status: "active", startedAt: new Date()}).where(eq(meetings.id, existingMeeting.id))
         }
 
-        const [existingAgent] = await db.select().from(agents).where(eq(agents.id, existingMeeting.agentId))
-    
-        if(!existingAgent){
-            return NextResponse.json({error: "Agent is not found"}, {status: 404})
-        }
-
-        try {
-            const call = streamVideo.video.call("default", meetingId);
-            await call.get();
-            const realtimeClient = await streamVideo.video.connectOpenAi({
-                call,
-                openAiApiKey: process.env.OPENAI_API_KEY!,
-                agentUserId: existingAgent.id,
-            })
-
-            await realtimeClient.updateSession({
-                instructions: existingAgent.instructions,
-            })
-        } catch (err) {
-            console.error("connectOpenAi failed", { meetingId, agentId: existingAgent.id, error: err });
-        }
+        // We no longer connect a voice agent here. The AI is a background entity
+        // that only processes transcripts and chat messages asynchronously.
+        return NextResponse.json({ status: "Ok" });
     }else if( eventType === "call.session_participant_left"){
         const event = payload as CallSessionParticipantLeftEvent;
         const meetingId = event.call_cid.split(":")[1];

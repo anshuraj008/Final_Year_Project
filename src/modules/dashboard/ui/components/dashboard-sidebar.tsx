@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { BotIcon, StarIcon, VideoIcon } from "lucide-react";
+import { BotIcon, StarIcon, VideoIcon, UsersIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -23,8 +23,13 @@ import { DashboardTrial } from "./dashboard-trial";
 const firstSection = [
   {
     icon: VideoIcon,
-    label: "Meetings",
-    href: "/meetings",
+    label: "My Meetings",
+    href: "/meetings?type=my-meetings",
+  },
+  {
+    icon: UsersIcon,
+    label: "Other Meetings",
+    href: "/meetings?type=others-meetings",
   },
   {
     icon: BotIcon,
@@ -43,6 +48,14 @@ const secondSection = [
 
 const DashboardSideber = () => {
   const pathname = usePathname();
+  // Ensure the type param is read when we are on /meetings
+  const isMeetingLink = (href: string) => {
+      // client-side window approach since useSearchParams from next/navigation might require a suspense boundary
+      if (typeof window !== "undefined") {
+          return pathname === "/meetings" && window.location.search.includes(href.split("?")[1]);
+      }
+      return false;
+  };
 
   return (
     <Sidebar>
@@ -66,9 +79,9 @@ const DashboardSideber = () => {
                     asChild
                     className={cn(
                       "h-10 hover:bg-linear-to-r/oklch border-transparent hover:border-[#5D6B68]/10 from-sidebar-accent from-5% via-30% via-sidebar/50 to-sidebar/50",
-                      pathname === item.href && "bg-linear-to-r/oklch border-[#5D6B68]"
+                      (pathname === item.href || isMeetingLink(item.href)) && "bg-linear-to-r/oklch border-[#5D6B68]"
                     )}
-                    isActive={pathname === item.href}
+                    isActive={pathname === item.href || isMeetingLink(item.href)}
                   >
                     <Link href={item.href}>
                       <item.icon className="size-5" />
