@@ -1,83 +1,156 @@
-# MEET-AI - E-commerce Website
+# Meet-AI 🎙️🤖
 
-## Overview
-This project is a full-featured **E-commerce Website** developed using the **MERN stack** (MongoDB, Express.js, React, Node.js). It includes a secure authentication system using **JWT (JSON Web Tokens)** and role-based authorization for admin and user access. The application uses **Redux** for state management, providing a centralized store to handle user sessions, products, and cart functionality efficiently.
+Meet-AI is a next-generation, real-time AI-powered meeting transcription and summarization platform. It enables seamless video conferencing, automated high-fidelity transcriptions, AI-driven meeting enrichment, and automated summary emails delivered directly to users. 
 
-> Try the app - [Go to website]()
+Equipped with robust queueing, caching layers, and subscription monetization, Meet-AI is engineered for production-ready performance.
 
-## Features
-- **Authentication**: Secure user registration and login using JWT.
-- **Role-Based Authorization**: Admin users have privileged access to manage products, orders, and users, while regular users can browse and purchase products.
-- **Product Management**: Add, edit, and delete products (admin access only).
-- **Cart System**: Add items to a cart and proceed to checkout.
-- **Order Management**: Place orders and view order history.
-- **Search and Filtering**: Search products and filter them by categories, price range, and more.
-- **Responsive Design**: Mobile-friendly user interface.
+---
 
-## Tech Stack
-### Frontend
-- **Next.js**: For building a dynamic and responsive user interface.
-- **Redux**: For managing application state in a centralized store.
-- **Axios**: For API communication.
+## 🚀 Key Features
 
-### Backend
-- **Node.js**: For server-side scripting.
-- **Express.js**: For building RESTful APIs.
-- **MongoDB**: As the NoSQL database for persistent storage.
-- **JWT**: For secure user authentication and session management.
+* **Real-time Video & Chat**: Powered by **Stream Video & Chat SDK** for high-performance audio/video calls, screen sharing, and real-time messaging.
+* **AI-Powered Meeting Insights**: Leverages **OpenAI & Gemini** via **Inngest Agent Kit** to process raw transcripts, extract key action items, and generate comprehensive meeting summaries.
+* **Event-Driven Workflow Queue**: Handles asynchronous post-meeting workloads (transcript fetching, AI analysis, email delivery) using **Inngest** for guaranteed background processing.
+* **Global Subscription Billing**: Integrated with **Polar.sh** to monetize the application, handle global tax compliance, manage recurring subscriptions, and enforce paywalls.
+* **Fast Caching Layer**: Utilizes **Redis** (via `ioredis`) as an in-memory cache to store meeting records and optimize response times, avoiding unnecessary database hits.
+* **End-to-End Type Safety**: Driven by a **tRPC** routing layer connecting the Next.js App Router backend with the client UI seamlessly.
+* **Seamless Authentication**: Powered by **Better-Auth** with plugins configured for Polar.sh, supporting Google, GitHub, and email/password providers.
+* **Modern Stack UI**: Designed with **TailwindCSS**, **Framer Motion**, **Radix UI**, **Lucide Icons**, and responsive layouts.
 
-### Other Tools
-- **Postman**: For API testing.
-- **Mongoose**: For MongoDB object modeling.
-- **Git**: For version control.
+---
 
-## System Architecture
-The application follows a **3-tier architecture**:
-1. **Frontend**: Handles user interactions and communicates with the backend via REST APIs.
-2. **Backend**: Implements business logic, authentication, and API endpoints.
-3. **Database**: Stores user information, product details, and orders.
+## 🛠️ Technical Stack
 
-## Installation and Setup
+* **Framework**: Next.js (App Router)
+* **API Layer**: tRPC
+* **Database**: PostgreSQL (Neon Database serverless) + Drizzle ORM
+* **Cache**: Redis (`ioredis`)
+* **Queue / Workflows**: Inngest
+* **Authentication**: Better-Auth
+* **Billing / Subscriptions**: Polar.sh
+* **Video/Chat Service**: Stream.io SDK
+* **AI Services**: OpenAI / Inngest Agent Kit
+
+---
+
+## 📐 System Architecture
+
+The application implements a decoupled, event-driven architecture designed to manage compute-heavy AI workflows smoothly without blocking the main thread:
+
+```mermaid
+graph TD
+  Client["Client (Next.js UI)"] --> LB["Load Balancer"]
+  LB --> Gateway["API Gateway (tRPC / Next API Routes)"]
+  
+  Gateway --> Realtime["Realtime Services"]
+  Realtime --> RTC["Stream (RTC) Video + Chat"]
+  
+  Gateway --> Backend["Core Backend (Node.js)"]
+  
+  %% Database & Caching (Parallel Integration)
+  Backend <--> Redis["Redis Cache"]
+  Backend <--> Postgres[("PostgreSQL (Database)")]
+  
+  %% Inngest Triggered from Core Backend/Gateway
+  Backend --> Queue["Event Queue (Inngest)"]
+  
+  Queue --> AI["AI Workers (Summaries)"]
+  AI --> Email["Email Service"]
+```
+
+1. **Meeting Interface**: The client participates in a call powered by the Stream SDK. When a meeting completes, a webhook triggers.
+2. **Database & Cache**: Core records are saved in **PostgreSQL**. **Redis** caches active meeting details (`meetingCache`) to speed up subsequent reads.
+3. **Inngest Queue**: Post-meeting tasks are pushed to Inngest to run asynchronously.
+4. **AI Processing**: Workers download the transcript, run AI summarization models, write the final summary back to Postgres/Redis, and mark the status as `completed`.
+5. **Email Dispatch**: A downstream Inngest function triggers the `emailService` to send a summary email to the host.
+
+---
+
+## ⚙️ Installation & Setup
+
 ### Prerequisites
-- Node.js
-- MongoDB
+
+Make sure you have the following installed:
+* **Node.js** (v18 or higher)
+* **PostgreSQL** (Neon or local instance)
+* **Redis** (Local instance or Upstash)
+* **Inngest Dev Server** (locally or via CLI)
+
+### Environment Variables
+
+Create a `.env` file in the root directory and add the following keys:
+
+```env
+# Database
+DATABASE_URL=postgresql://...
+
+# Redis
+REDIS_URL=redis://127.0.0.1:6379
+
+# Better Auth
+BETTER_AUTH_SECRET=your_better_auth_secret
+BETTER_AUTH_URL=http://localhost:3000
+
+# Auth Providers
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Stream.io (Video + Chat)
+NEXT_PUBLIC_STREAM_API_KEY=your_stream_api_key
+STREAM_API_SECRET=your_stream_api_secret
+
+# Polar (Billing)
+POLAR_ACCESS_TOKEN=polar_sdt_...   # Sandbox token for local testing
+NEXT_PUBLIC_POLAR_ORGANIZATION_ID=your_polar_org_id
+
+# OpenAI (AI Summaries)
+OPENAI_API_KEY=your_openai_api_key
+
+# Inngest
+INNGEST_EVENT_KEY=your_inngest_event_key
+INNGEST_SIGNING_KEY=your_inngest_signing_key
+```
 
 ### Steps to Run
-#### Backend
-1. Clone the repository and navigate to the backend folder:
+
+1. **Clone and Install Dependencies**:
    ```bash
-   git clone https://github.com/.git
-   cd Lavishta
-   ```
-2. Install dependencies:
-   ```bash
+   git clone <repository-url>
+   cd Meet-AI
    npm install
    ```
-3. Configure environment variables in a `/backend/config/config.env` file:
-   ```env
-   DATABASE_URL=<Your_DB_URL>
-   BETTER_AUTH_SECRET=<Your_Better_Auth_Secret>
-   BETTER_AUTH_URL=<Your_Better_Auth_URL>
-   GITHUB_CLIENT_ID=<Your_Github_Client_Secret_Key>
-   GITHUB_CLIENT_SECRET=<Your_Github_Client_Secret_Key>
-   GOOGLE_CLIENT_ID=<Your_Google_Client_ID>
-   GOOGLE_CLIENT_SECRET=<Your_Google_Client_Secret_Key>
-   NEXT_APP_URL="http://localhost:3000"
+
+2. **Setup and Migrate the Database**:
+   ```bash
+   npm run db:push
    ```
-4. Start the server:
+
+3. **Start the Development Server**:
    ```bash
    npm run dev
    ```
 
-#### Access the Application
-- Open your browser and navigate to `http://localhost:3000`.
+4. **Start the Inngest Dev Server (for event-driven workflow testing)**:
+   ```bash
+   npx inngest-cli@latest dev
+   ```
 
-## Usage
-1. **User Registration/Login**: Create an account or log in to access features.
-2. **Browse Products**: Explore products and add them to your cart.
-3. **Admin Access**: Log in as an admin to manage products, orders, and users.
-4. **Place Orders**: Add items to your cart and proceed to checkout.
-5. **Order History**: View your past orders in the user dashboard.
+5. **Start Webhook Tunnel (Optional - for Polar/Stream webhook testing)**:
+   ```bash
+   npm run dev:webhook
+   ```
 
-## Contact
-- **Email**: mir.saif.ali2004@gmail.com
+---
+
+## 🔒 Access & Premium Quotas
+Meet-AI utilizes custom TRPC middleware (`premiumProcedure`) linked to **Polar.sh** to manage quotas:
+* **Free Tier**: Limited to a maximum number of free meetings (`MAX_FREE_MEETINGS`).
+* **Premium Tier**: Unlimited meetings, advanced summaries, and immediate processing. Active subscription checking is handled entirely in memory and cached dynamically.
+
+---
+
+## 📧 Contact & Support
+* **Email**: mir.saif.ali2004@gmail.com
+* **Project**: [Meet-AI GitHub](https://github.com/mir.saif.ali2004/Meet-AI)
