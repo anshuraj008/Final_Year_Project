@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
-import { CallControls, SpeakerLayout, PaginatedGridLayout } from "@stream-io/video-react-sdk";
+import { useState, useEffect } from "react";
+import { CallControls, SpeakerLayout, PaginatedGridLayout, DefaultParticipantViewUI, useCallStateHooks } from "@stream-io/video-react-sdk";
 import { LayoutGrid, User, Copy, Check, MessageSquare } from "lucide-react";
 import { StreamChat } from "stream-chat";
 import { CallChat } from "./call-chat";
 import { OpenAIChatbox } from "./openai-chatbox";
+import { useTRPC } from "@/trpc/client";
+import { useQuery } from "@tanstack/react-query";
 
 import "stream-chat-react/dist/css/v2/index.css";
 
@@ -19,6 +21,64 @@ interface Props {
 }
 
 export const CallActive = ({ onLeave, meetingName, meetingId, chatClient }: Props) => {
+    const trpc = useTRPC();
+    const { useLocalParticipant } = useCallStateHooks();
+    const localParticipant = useLocalParticipant();
+    const currentUserId = localParticipant?.userId;
+
+    const { data: meeting } = useQuery(
+        trpc.meetings.getOne.queryOptions({ id: meetingId }),
+    );
+
+    const isOriginalHost = meeting ? meeting.userId === currentUserId : false;
+    const isCoHost = meeting?.coHostIds ? meeting.coHostIds.includes(currentUserId ?? "") : false;
+    const isHostOrCoHost = isOriginalHost || isCoHost;
+
+    useEffect(() => {
+        if (isHostOrCoHost) return;
+
+        const observer = new MutationObserver(() => {
+            // Find all buttons or elements that might be menu items inside popovers or dropdowns
+            const items = document.querySelectorAll(
+                ".str-video__menu-container button, [class*='menu-item'], .str-video__menu-item, [role='menuitem']"
+            );
+
+            items.forEach((item) => {
+                const el = item as HTMLElement;
+                const text = el.textContent?.trim().toLowerCase() || "";
+                
+                // Allowed options: "pin", "unpin", "enter fullscreen", "exit fullscreen", "fullscreen"
+                // Restricted options (host-only moderation actions):
+                const isRestricted = 
+                    text.includes("block") || 
+                    text.includes("kick") || 
+                    text.includes("everyone") || 
+                    text.includes("allow") || 
+                    text.includes("disable") || 
+                    text.includes("mute");
+
+                if (isRestricted) {
+                    el.style.setProperty("display", "none", "important");
+                }
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+
+        return () => observer.disconnect();
+    }, [isHostOrCoHost]);
+
+    const CustomParticipantOverlay = (props: React.ComponentProps<typeof DefaultParticipantViewUI>) => {
+        return (
+            <div className="h-full w-full">
+                <DefaultParticipantViewUI {...props} />
+            </div>
+        );
+    };
+
     const [layout, setLayout] = useState<"grid" | "speaker">("grid");
     const [copied, setCopied] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -88,7 +148,14 @@ export const CallActive = ({ onLeave, meetingName, meetingId, chatClient }: Prop
 
                 {/* Video area */}
                 <div className="flex-1 w-full relative overflow-hidden">
-                    {layout === "grid" ? <PaginatedGridLayout /> : <SpeakerLayout />}
+                    {layout === "grid" ? (
+                        <PaginatedGridLayout ParticipantViewUI={CustomParticipantOverlay} />
+                    ) : (
+                        <SpeakerLayout
+                            ParticipantViewUISpotlight={CustomParticipantOverlay}
+                            ParticipantViewUIBar={CustomParticipantOverlay}
+                        />
+                    )}
                 </div>
 
                 {/* Controls */}

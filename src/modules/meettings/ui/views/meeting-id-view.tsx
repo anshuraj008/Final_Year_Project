@@ -61,7 +61,8 @@ export const MeetingIdView = ({ meetingId }: Props) => {
     const isCompleted = data.status === "completed";
     const isCancelled = data.status === "cancelled";
     const isProcessing = data.status === "processing";
-    const isHost = data.userId === session?.user?.id;
+    const isOriginalHost = data.userId === session?.user?.id;
+    const isHost = isOriginalHost || (data.coHostIds?.includes(session?.user?.id ?? "") ?? false);
 
     return (
         <>
@@ -75,7 +76,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
                 <MeetingIdViewHeader
                     meetingId={meetingId}
                     meetingName={data?.name}
-                    isHost={isHost}
+                    isHost={isOriginalHost} // Only the original host can edit or remove the meeting
                     onEdit={() => setUpdateMeetingDialogOpen(true)}
                     onRemove={handleRemoveMeeting}
                     disabled={removeMeeting.isPending}
@@ -88,6 +89,7 @@ export const MeetingIdView = ({ meetingId }: Props) => {
                 {isUpcoming && (<UpcomingState
                     meetingId={meetingId}
                     isHost={isHost}
+                    isOriginalHost={isOriginalHost}
                 />)}
             </div>
         </>

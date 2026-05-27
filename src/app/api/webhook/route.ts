@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ChatCompletionMessageParam } from "openai/resources/index.mjs";
 import { CallEndedEvent, CallTranscriptionReadyEvent, CallSessionParticipantLeftEvent, CallRecordingReadyEvent, CallSessionStartedEvent } from "@stream-io/node-sdk";
 import { db } from "@/db";
-import { meetings } from "@/db/schema";
+import { meetings, meetingParticipants } from "@/db/schema";
 import { streamVideo } from "@/lib/stream-video";
 import { inngest } from "@/inngest/client";
 import { generateAvatarUri } from "@/lib/avatar";
@@ -128,6 +128,32 @@ export async function POST(req:NextRequest) {
         const meetingId = event.call_cid.split(":")[1];
 
         await db.update(meetings).set({recordingUrl: event.call_recording.url}).where(eq(meetings.id, meetingId))
+    } else if (eventType === "call.kicked_user") {
+        const event = payload as { call_cid: string; user: { id: string } };
+        const meetingId = event.call_cid.split(":")[1];
+        const userId = event.user.id;
+
+        if (meetingId && userId) {
+            await db.update(meetingParticipants)
+                .set({ isKicked: true })
+                .where(and(
+                    eq(meetingParticipants.meetingId, meetingId),
+                    eq(meetingParticipants.userId, userId)
+                ));
+        }
+    } else if (eventType === "call.blocked_user") {
+        const event = payload as { call_cid: string; user: { id: string } };
+        const meetingId = event.call_cid.split(":")[1];
+        const userId = event.user.id;
+
+        if (meetingId && userId) {
+            await db.update(meetingParticipants)
+                .set({ isBlocked: true })
+                .where(and(
+                    eq(meetingParticipants.meetingId, meetingId),
+                    eq(meetingParticipants.userId, userId)
+                ));
+        }
     } else if (eventType === "message.new") {
         const event = payload as { user?: { id: string }; channel_id?: string; message?: { text?: string } };
         const userId = event.user?.id;

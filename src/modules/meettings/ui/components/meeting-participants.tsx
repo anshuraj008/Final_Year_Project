@@ -11,9 +11,10 @@ interface Props {
   meetingId: string;
   hostId?: string;
   currentUserId?: string;
+  coHostIds?: string[];
 }
 
-export const MeetingParticipants = ({ meetingId, hostId, currentUserId }: Props) => {
+export const MeetingParticipants = ({ meetingId, hostId, currentUserId, coHostIds }: Props) => {
   const trpc = useTRPC();
   const { data: participants, isPending, error } = useQuery(
     trpc.meetings.getParticipants.queryOptions({ meetingId }),
@@ -53,6 +54,7 @@ export const MeetingParticipants = ({ meetingId, hostId, currentUserId }: Props)
               {participants.map((participant) => {
                 const isCurrentUser = currentUserId && participant.id === currentUserId;
                 const isParticipantHost = hostId && participant.id === hostId;
+                const isParticipantCoHost = coHostIds && coHostIds.includes(participant.id);
                 return (
                   <div
                     key={participant.id}
@@ -94,6 +96,14 @@ export const MeetingParticipants = ({ meetingId, hostId, currentUserId }: Props)
                               className="text-[10px] px-1.5 py-0 h-4 font-semibold bg-amber-100 text-amber-700 border-amber-200 leading-none"
                             >
                               Host
+                            </Badge>
+                          )}
+                          {isParticipantCoHost && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5 py-0 h-4 font-semibold bg-emerald-100 text-emerald-700 border-emerald-200 leading-none"
+                            >
+                              Co-Host
                             </Badge>
                           )}
                         </div>

@@ -3,13 +3,15 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { VideoIcon, ClipboardIcon, CheckIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
+import { CoHostManager } from "./co-host-manager";
 
 interface Props {
   meetingId: string;
   isHost?: boolean;
+  isOriginalHost?: boolean;
 }
 
-export const UpcomingState = ({ meetingId, isHost }: Props) => {
+export const UpcomingState = ({ meetingId, isHost, isOriginalHost }: Props) => {
   const [copiedId, setCopiedId] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [meetingLink, setMeetingLink] = useState(`/meetings/${meetingId}`);
@@ -44,59 +46,67 @@ export const UpcomingState = ({ meetingId, isHost }: Props) => {
       />
       
       {isHost ? (
-        /* Meeting Credentials Section (Host Only) */
-        <div className="w-full max-w-md bg-gray-50/50 rounded-xl border border-gray-100 p-5 flex flex-col gap-y-4">
-          <div className="flex items-center gap-x-2 border-b pb-3 mb-1">
-            <ShieldCheckIcon className="size-5 text-green-600" />
-            <span className="font-semibold text-sm text-gray-800">Meeting Joining Info</span>
-          </div>
+        /* Responsive two-column grid layout for Host details */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-4xl mt-2">
+          {/* Meeting Credentials Section (Host Only) */}
+          <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-5 flex flex-col gap-y-4 h-full justify-between">
+            <div className="flex flex-col gap-y-4">
+              <div className="flex items-center gap-x-2 border-b pb-3 mb-1">
+                <ShieldCheckIcon className="size-5 text-green-600" />
+                <span className="font-semibold text-sm text-gray-800">Meeting Joining Info</span>
+              </div>
 
-          <div className="flex flex-col gap-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting ID</span>
-            <div className="flex items-center gap-x-2">
-              <code className="flex-1 bg-white border border-gray-200 px-3 py-2 rounded-lg text-xs text-gray-800 font-mono overflow-x-auto whitespace-nowrap">
-                {meetingId}
-              </code>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="shrink-0 size-9 rounded-lg"
-                onClick={() => copyToClipboard(meetingId, false)}
-              >
-                {copiedId ? (
-                  <CheckIcon className="size-4 text-green-600 animate-in fade-in" />
-                ) : (
-                  <ClipboardIcon className="size-4 text-gray-500" />
-                )}
-              </Button>
+              <div className="flex flex-col gap-y-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting ID</span>
+                <div className="flex items-center gap-x-2">
+                  <code className="flex-1 bg-white border border-gray-200 px-3 py-2 rounded-lg text-xs text-gray-800 font-mono overflow-x-auto whitespace-nowrap">
+                    {meetingId}
+                  </code>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="shrink-0 size-9 rounded-lg"
+                    onClick={() => copyToClipboard(meetingId, false)}
+                  >
+                    {copiedId ? (
+                      <CheckIcon className="size-4 text-green-600 animate-in fade-in" />
+                    ) : (
+                      <ClipboardIcon className="size-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-y-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Invite Link</span>
+                <div className="flex items-center gap-x-2">
+                  <code className="flex-1 bg-white border border-gray-200 px-3 py-2 rounded-lg text-xs text-gray-600 overflow-x-auto whitespace-nowrap">
+                    {meetingLink}
+                  </code>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="shrink-0 size-9 rounded-lg"
+                    onClick={() => copyToClipboard(meetingLink, true)}
+                  >
+                    {copiedLink ? (
+                      <CheckIcon className="size-4 text-green-600 animate-in fade-in" />
+                    ) : (
+                      <ClipboardIcon className="size-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-400 leading-normal flex items-start gap-x-1.5 mt-4">
+              <span>🔒</span>
+              <span>This meeting is protected. There is no password required; only people with the unique Meeting ID or Invite Link can join the call.</span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-y-1">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Invite Link</span>
-            <div className="flex items-center gap-x-2">
-              <code className="flex-1 bg-white border border-gray-200 px-3 py-2 rounded-lg text-xs text-gray-600 overflow-x-auto whitespace-nowrap">
-                {meetingLink}
-              </code>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="shrink-0 size-9 rounded-lg"
-                onClick={() => copyToClipboard(meetingLink, true)}
-              >
-                {copiedLink ? (
-                  <CheckIcon className="size-4 text-green-600 animate-in fade-in" />
-                ) : (
-                  <ClipboardIcon className="size-4 text-gray-500" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          <div className="text-xs text-gray-400 leading-normal flex items-start gap-x-1.5 mt-1">
-            <span>🔒</span>
-            <span>This meeting is protected. There is no password required; only people with the unique Meeting ID or Invite Link can join the call.</span>
-          </div>
+          {/* Co-Host Manager Section */}
+          <CoHostManager meetingId={meetingId} isOriginalHost={isOriginalHost} />
         </div>
       ) : (
         /* Invitation Card (Participants Only) */

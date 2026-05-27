@@ -140,3 +140,8 @@
     cursor: pointer;
   }
 }
+
+/* Hide participant menu buttons and context menus for non-hosts/non-co-hosts */
+.hide-participant-menu-restricted-only {
+  /* We handle restriction dynamically via MutationObserver to preserve Pin and Fullscreen */
+}

@@ -2,7 +2,7 @@ import { z } from "zod";
 import JSONL from "jsonl-parse-stringify";
 import { and, count, desc, eq, getTableColumns, ilike, inArray, sql, not } from "drizzle-orm";
 import { db } from "@/db";
-import { meetings, user, meetingParticipants } from "@/db/schema";
+import { meetings, user, meetingParticipants, meetingCoHosts } from "@/db/schema";
 import { createTRPCRouter, premiumProcedure, protectedProcedure } from "@/trpc/init";
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE, SYSTEM_AGENT_ID, SYSTEM_AGENT_NAME } from "@/constants";
 import { TRPCError } from "@trpc/server";
@@ -116,7 +116,21 @@ export const meetingssRouter = createTRPCRouter({
                 .from(meetings)
                 .where(eq(meetings.id, input.meetingId));
 
-            const isHost = meeting ? meeting.userId === ctx.auth.user.id : false;
+            const isOriginalHost = meeting ? meeting.userId === ctx.auth.user.id : false;
+            let isCoHost = false;
+            if (meeting) {
+                const [coHost] = await db
+                    .select()
+                    .from(meetingCoHosts)
+                    .where(and(
+                        eq(meetingCoHosts.meetingId, input.meetingId),
+                        eq(meetingCoHosts.userId, ctx.auth.user.id)
+                    ));
+                if (coHost) {
+                    isCoHost = true;
+                }
+            }
+            const isHost = isOriginalHost || isCoHost;
             const role = isHost ? "admin" : "user";
 
             if (isHost && meeting && meeting.status === "upcoming") {
@@ -236,7 +250,7 @@ export const meetingssRouter = createTRPCRouter({
 
     getOne: protectedProcedure
         .input(z.object({ id: z.string() }))
-        .query(async ({ input }) => {
+        .query(async ({ input, ctx }) => {
             const [existingMeeting] = await db
                 .select({
                     ...getTableColumns(meetings),
@@ -253,7 +267,33 @@ export const meetingssRouter = createTRPCRouter({
                 throw new TRPCError({ code: "NOT_FOUND", message: "Meeting not found" })
             }
 
-            return existingMeeting;
+            // Check if the current user is kicked or blocked
+            const [participant] = await db
+                .select()
+                .from(meetingParticipants)
+                .where(and(
+                    eq(meetingParticipants.meetingId, input.id),
+                    eq(meetingParticipants.userId, ctx.auth.user.id)
+                ));
+
+            if (participant && (participant.isKicked || participant.isBlocked)) {
+                throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: participant.isBlocked
+                        ? "You have been blocked from this meeting."
+                        : "You have been kicked from this meeting.",
+                });
+            }
+
+            const coHosts = await db
+                .select({ userId: meetingCoHosts.userId })
+                .from(meetingCoHosts)
+                .where(eq(meetingCoHosts.meetingId, input.id));
+
+            return {
+                ...existingMeeting,
+                coHostIds: coHosts.map((ch) => ch.userId),
+            };
         }),
 
     getParticipants: protectedProcedure
@@ -394,6 +434,112 @@ export const meetingssRouter = createTRPCRouter({
                     message: "Failed to get response from OpenAI",
                 });
             }
+        }),
+
+    getCoHosts: protectedProcedure
+        .input(z.object({ meetingId: z.string() }))
+        .query(async ({ input }) => {
+            const coHosts = await db
+                .select({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    image: user.image,
+                })
+                .from(meetingCoHosts)
+                .innerJoin(user, eq(meetingCoHosts.userId, user.id))
+                .where(eq(meetingCoHosts.meetingId, input.meetingId));
+
+            return coHosts;
+        }),
+
+    addCoHost: protectedProcedure
+        .input(z.object({ meetingId: z.string(), email: z.string().email() }))
+        .mutation(async ({ input, ctx }) => {
+            const [meeting] = await db
+                .select()
+                .from(meetings)
+                .where(and(eq(meetings.id, input.meetingId), eq(meetings.userId, ctx.auth.user.id)));
+
+            if (!meeting) {
+                throw new TRPCError({
+                    code: "UNAUTHORIZED",
+                    message: "Only the meeting host can add co-hosts.",
+                });
+            }
+
+            if (meeting.status !== "upcoming") {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "Co-hosts can only be added before the meeting starts.",
+                });
+            }
+
+            const [targetUser] = await db
+                .select()
+                .from(user)
+                .where(eq(user.email, input.email));
+
+            if (!targetUser) {
+                throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: "User with this email not found.",
+                });
+            }
+
+            if (targetUser.id === ctx.auth.user.id) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "You are already the host of this meeting.",
+                });
+            }
+
+            try {
+                await db.insert(meetingCoHosts).values({
+                    meetingId: input.meetingId,
+                    userId: targetUser.id,
+                });
+            } catch {
+                // Ignore unique constraint violation (already a co-host)
+            }
+
+            return {
+                id: targetUser.id,
+                name: targetUser.name,
+                email: targetUser.email,
+            };
+        }),
+
+    removeCoHost: protectedProcedure
+        .input(z.object({ meetingId: z.string(), userId: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+            const [meeting] = await db
+                .select()
+                .from(meetings)
+                .where(and(eq(meetings.id, input.meetingId), eq(meetings.userId, ctx.auth.user.id)));
+
+            if (!meeting) {
+                throw new TRPCError({
+                    code: "UNAUTHORIZED",
+                    message: "Only the meeting host can remove co-hosts.",
+                });
+            }
+
+            if (meeting.status !== "upcoming") {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "Co-hosts can only be removed before the meeting starts.",
+                });
+            }
+
+            await db
+                .delete(meetingCoHosts)
+                .where(and(
+                    eq(meetingCoHosts.meetingId, input.meetingId),
+                    eq(meetingCoHosts.userId, input.userId)
+                ));
+
+            return { success: true };
         }),
 
 });

@@ -1,5 +1,5 @@
 import { StreamTheme, useCall, CallingState } from "@stream-io/video-react-sdk";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { StreamChat } from "stream-chat";
 import { CallLobby } from "./call-lobby";
 import { CallActive } from "./call-active";
@@ -16,7 +16,25 @@ export const CallUI = ({ meetingId, meetingName, chatClient }: Props) => {
 
     const [show, setShow] = useState<"lobby" | "call" | "ended">("lobby");
     const [isJoining, setIsJoining] = useState(false);
+    const [kickedReason, setKickedReason] = useState<string | null>(null);
     const isLeavingRef = useRef(false);
+
+    useEffect(() => {
+        if (!call) return;
+
+        const unsubscribe = call.on("call.ended", (event) => {
+            if (
+                event.reason === "kicked" ||
+                event.reason === "blocked" ||
+                event.reason === "PolicyViolationModeration"
+            ) {
+                setKickedReason(event.reason);
+                setShow("ended");
+            }
+        });
+
+        return () => unsubscribe();
+    }, [call]);
 
     const handleJoin = async () => {
         if (!call || isJoining) return;
@@ -74,7 +92,7 @@ export const CallUI = ({ meetingId, meetingName, chatClient }: Props) => {
                     chatClient={chatClient}
                 />
             )}
-            {show === "ended" && <CallEnded />}
+            {show === "ended" && <CallEnded kickedReason={kickedReason} />}
         </StreamTheme>
     );
 };

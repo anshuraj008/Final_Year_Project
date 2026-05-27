@@ -71,6 +71,7 @@ export const CompletedState = ({data, isHost}: Props) => {
                                 meetingId={data.id}
                                 hostId={data.userId}
                                 currentUserId={session?.user?.id}
+                                coHostIds={data.coHostIds}
                             />
                         </div>
                     </TabsContent>
