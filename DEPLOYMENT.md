@@ -75,8 +75,8 @@ aws configure
 
 Then clone the repository and create your `.env` file:
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/Meet-AI.git
-cd Meet-AI
+git clone https://github.com/YOUR_GITHUB_USERNAME/Final_Year_Project.git
+cd Final_Year_Project
 nano .env
 # Paste all your environment variables and save (Ctrl+O, Enter, Ctrl+X)
 ```

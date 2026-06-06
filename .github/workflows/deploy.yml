@@ -86,7 +86,7 @@ jobs:
             docker pull $ECR_IMAGE
 
             # 3. Stop and remove old containers
-            cd ~/Meet-AI
+            cd ~/Final_Year_Project
             git pull origin main
             docker compose -f docker-compose.prod.yml down
 
